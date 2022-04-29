@@ -1,0 +1,56 @@
+service: url-short-serverless
+
+plugins:
+  - serverless-plugin-typescript
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  environment:
+    DYNAMO_ATOMIC: ${self:resources.Resources.atomicCounter.Properties.TableName}
+    S3_BUCKET: ${self:resources.Resources.page.Properties.BucketName}
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - dynamodb:UpdateItem
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource:
+        - "Fn::GetAtt":
+            - atomicCounter
+            - Arn
+    - Effect: "Allow"
+      Action:
+        - s3:PutObject
+        - s3:PutObjectAcl
+      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
+functions:
+  shortUrl:
+    handler: handler.short
+    url: 
+      cors: true
+resources:
+  Resources:
+    atomicCounter:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: atomic_counter
+        AttributeDefinitions:
+          - AttributeName: name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: name
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+    page:
+      Type: AWS::S3::Bucket
+      Properties:
+        AccessControl: PublicRead
+        BucketName: cmcloudlab544.info
+        WebsiteConfiguration:
+          IndexDocument: index.html
+        VersioningConfiguration:
+          Status: Suspended

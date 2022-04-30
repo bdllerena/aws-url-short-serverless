@@ -1,4 +1,4 @@
-service: url-short-serverless
+service: url-shortener
 
 plugins:
   - serverless-plugin-typescript
@@ -6,9 +6,13 @@ plugins:
 provider:
   name: aws
   runtime: nodejs14.x
+  region: us-east-1
+  stage: dev
   environment:
     DYNAMO_ATOMIC: ${self:resources.Resources.atomicCounter.Properties.TableName}
-    S3_BUCKET: ${self:resources.Resources.page.Properties.BucketName}
+    DOMAIN: ${ssm:/${self:provider.stage}/${self:service}/DOMAIN}
+    APPLICATION_NAME: ${ssm:/${self:provider.stage}/${self:service}/APPLICATION_NAME}
+    S3_NAME: ${ssm:/${self:provider.stage}/${self:service}/S3_NAME}
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -24,7 +28,7 @@ provider:
       Action:
         - s3:PutObject
         - s3:PutObjectAcl
-      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
+      Resource: "arn:aws:s3:::${self:provider.environment.S3_NAME}/*"
 functions:
   shortUrl:
     handler: handler.short
@@ -49,8 +53,14 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         AccessControl: PublicRead
-        BucketName: cmcloudlab544.info
+        BucketName: ${self:provider.environment.S3_NAME}
         WebsiteConfiguration:
           IndexDocument: index.html
         VersioningConfiguration:
           Status: Suspended
+        LifecycleConfiguration:
+          Rules:
+            -
+              ExpirationInDays: 5
+              Prefix: '/'
+              Status: Enabled
